@@ -1,0 +1,48 @@
+# render.yaml — Blueprint Render pour le projet Afiri
+# Ce fichier définit les deux services à déployer automatiquement.
+# Place ce fichier à la RACINE du dépôt Git (au même niveau que back-end/ et Frontend/).
+#
+# Documentation Render : https://render.com/docs/blueprint-spec
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────
+  # SERVICE 1 : API Back-end (FastAPI + Python)
+  # ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: afiri-api
+    env: python
+    rootDir: back-end
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+
+    envVars:
+      # SECRET_KEY : Render génère une valeur aléatoire sécurisée automatiquement
+      - key: SECRET_KEY
+        generateValue: true
+
+      # DATABASE_URL : pointe vers le disque persistant (voir section disk ci-dessous)
+      # Le chemin /data est le point de montage du disque Render
+      - key: DATABASE_URL
+        value: sqlite:////data/careertech.db
+
+    # Disque persistant pour la base SQLite
+    # IMPORTANT : sans ce disque, la base de données est effacée à chaque redéploiement.
+    # Le plan gratuit Render ne propose pas de disque persistant.
+    # Options :
+    #   - Passer au plan Starter (payant) pour activer le disque
+    #   - OU remplacer SQLite par PostgreSQL (voir note dans DEPLOIEMENT.md)
+    disk:
+      name: afiri-sqlite-disk
+      mountPath: /data
+      sizeGB: 1
+
+  # ─────────────────────────────────────────────────────────────────
+  # SERVICE 2 : Frontend (Site statique HTML/CSS/JS)
+  # ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: afiri-frontend
+    env: static
+    rootDir: Frontend
+    buildCommand: ""          # Pas de build nécessaire (HTML pur)
+    staticPublishPath: .      # Publie tout le dossier Frontend/

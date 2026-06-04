@@ -1,0 +1,44 @@
+# ─── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ─── Environnement virtuel ────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ─── Fichiers sensibles — NE JAMAIS committer ─────────────────────
+.env
+*.env
+!.env.example
+
+# ─── Base de données locale ───────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Éditeurs ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Logs ─────────────────────────────────────────────────────────
+*.log
+pip-log.txt
+*.egg
+
+# ─── Cache Python ─────────────────────────────────────────────────
+.mypy_cache/
+.pytest_cache/
+*.pyc
