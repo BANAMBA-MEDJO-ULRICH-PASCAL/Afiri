@@ -284,7 +284,7 @@ function initQuiz() {
           <span>Types d'offres recommandées</span>
           ${offerTypes[bestType].map((offer) => `<b>${offer}</b>`).join("")}
         </div>
-        <a class="result-link" href="offres.html">Découvrir nos recommandations</a>
+        <a class="result-link" href="app.html">Découvrir nos recommandations</a>
       </section>
     `;
     nextButton.textContent = "Recommencer";
