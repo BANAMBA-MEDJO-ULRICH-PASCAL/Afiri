@@ -3,8 +3,11 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.user import Utilisateur, ProfilEtudiant, RoleEnum
-from schemas.profiles import ProfilCreate, ProfilUpdate, ProfilResponse
+from models.quiz import QuizResultat
+from schemas.profiles import ProfilCreate, ProfilUpdate, ProfilResponse, ProfilCompletionResponse
 from security import get_current_user
+from utils.profile_completion import calculer_completion
+from utils.student_profile import obtenir_ou_creer_profil
 
 router = APIRouter(
     prefix="/profils",
@@ -41,6 +44,7 @@ def creer_profil(
         universite=donnees_profil.universite,
         competences=donnees_profil.competences,
         experiences=donnees_profil.experiences,
+        projets=donnees_profil.projets,
         cv_lien=donnees_profil.cv_lien
     )
     db.add(nouveau_profil)
@@ -54,15 +58,7 @@ def obtenir_mon_profil(
     db: Session = Depends(get_db),
     utilisateur_courant: Utilisateur = Depends(get_current_user)
 ):
-    profil = db.query(ProfilEtudiant).filter(
-        ProfilEtudiant.utilisateur_id == utilisateur_courant.id
-    ).first()
-    if not profil:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vous n'avez pas encore créé de profil étudiant."
-        )
-    return profil
+    return obtenir_ou_creer_profil(db, utilisateur_courant)
 
 
 @router.put("/moi", response_model=ProfilResponse)
@@ -71,14 +67,7 @@ def mettre_a_jour_mon_profil(
     db: Session = Depends(get_db),
     utilisateur_courant: Utilisateur = Depends(get_current_user)
 ):
-    profil = db.query(ProfilEtudiant).filter(
-        ProfilEtudiant.utilisateur_id == utilisateur_courant.id
-    ).first()
-    if not profil:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vous n'avez pas encore créé de profil étudiant."
-        )
+    profil = obtenir_ou_creer_profil(db, utilisateur_courant)
 
     # .model_dump() remplace .dict() en Pydantic v2
     champs_a_modifier = donnees_profil.model_dump(exclude_unset=True)
@@ -88,6 +77,20 @@ def mettre_a_jour_mon_profil(
     db.commit()
     db.refresh(profil)
     return profil
+
+
+@router.get("/moi/completion", response_model=ProfilCompletionResponse)
+def obtenir_completion_profil(
+    db: Session = Depends(get_db),
+    utilisateur_courant: Utilisateur = Depends(get_current_user),
+):
+    profil = obtenir_ou_creer_profil(db, utilisateur_courant)
+
+    quiz = db.query(QuizResultat).filter(
+        QuizResultat.utilisateur_id == utilisateur_courant.id
+    ).order_by(QuizResultat.date_quiz.desc()).first()
+
+    return calculer_completion(profil, quiz)
 
 
 @router.get("/{profil_id}", response_model=ProfilResponse)

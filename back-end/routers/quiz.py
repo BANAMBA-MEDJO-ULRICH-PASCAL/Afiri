@@ -76,18 +76,43 @@ SUGGESTIONS_PAR_DEFAUT = [
 # POST /quiz/envoyer
 # ─────────────────────────────────────────────────────────────────
 
+TYPE_TO_FILIERE = {
+    "dev": "informatique",
+    "design": "marketing",
+    "data": "informatique",
+    "project": "gestion",
+    "marketing": "marketing",
+    "support": "informatique",
+}
+
+
 @router.post("/envoyer", response_model=QuizSubmitResponse)
 def submit_quiz(
     data: QuizSubmit,
     db: Session = Depends(get_db),
     utilisateur_courant: Utilisateur = Depends(get_current_user)
 ):
-    domaine = data.reponses.get("filiere", "").lower()
-    suggestions = SUGGESTIONS_PAR_DOMAINE.get(domaine, SUGGESTIONS_PAR_DEFAUT)
+    reponses = dict(data.reponses)
+
+    if reponses.get("skipped"):
+        reponses.setdefault("complete", False)
+        reponses.setdefault("partial", False)
+        suggestions = []
+    elif reponses.get("partial"):
+        quiz_type = reponses.get("type", "")
+        domaine = reponses.get("filiere", TYPE_TO_FILIERE.get(quiz_type, "")).lower()
+        reponses["filiere"] = domaine
+        suggestions = SUGGESTIONS_PAR_DOMAINE.get(domaine, SUGGESTIONS_PAR_DEFAUT)[:2]
+    else:
+        quiz_type = reponses.get("type", "")
+        domaine = reponses.get("filiere", TYPE_TO_FILIERE.get(quiz_type, "")).lower()
+        reponses["filiere"] = domaine
+        reponses["complete"] = True
+        suggestions = SUGGESTIONS_PAR_DOMAINE.get(domaine, SUGGESTIONS_PAR_DEFAUT)
 
     quiz = QuizResultat(
         utilisateur_id=utilisateur_courant.id,
-        reponses=json.dumps(data.reponses),
+        reponses=json.dumps(reponses),
         suggestions=json.dumps(suggestions)
     )
 

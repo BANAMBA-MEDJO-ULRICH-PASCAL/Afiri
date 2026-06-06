@@ -33,3 +33,11 @@ class OfferResponse(OfferBase):
     date_expiration: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OfferEnrichedResponse(OfferResponse):
+    entreprise_nom: Optional[str] = None
+
+
+class OfferRecommendationResponse(OfferEnrichedResponse):
+    score: int = 0

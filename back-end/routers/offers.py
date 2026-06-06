@@ -4,9 +4,12 @@ from typing import List, Optional
 
 from database import get_db
 from models.offer import OffreEmploi
-from models.user import Utilisateur, RoleEnum, Entreprise
-from schemas.offer import OfferCreate, OfferResponse
+from models.user import Utilisateur, RoleEnum, Entreprise, ProfilEtudiant
+from models.quiz import QuizResultat
+from schemas.offer import OfferCreate, OfferResponse, OfferEnrichedResponse, OfferRecommendationResponse
 from security import get_current_user
+from utils.profile_completion import calculer_completion
+from utils.recommendations import recommander_offres
 
 router = APIRouter(
     prefix="/offres",
@@ -52,7 +55,40 @@ def create_offer(
     return new_offer
 
 
-@router.get("/", response_model=List[OfferResponse])
+def _enrich_offer(offer: OffreEmploi, entreprises: dict) -> dict:
+    ent = entreprises.get(offer.entreprise_id)
+    data = OfferResponse.model_validate(offer).model_dump()
+    data["entreprise_nom"] = ent.nom if ent else "Entreprise"
+    return data
+
+
+@router.get("/recommandees", response_model=List[OfferRecommendationResponse])
+def get_recommended_offers(
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(get_current_user),
+    limit: int = 8,
+):
+    """Offres recommandées selon le quiz et le profil (auth requis)."""
+    if current_user.role != RoleEnum.etudiant:
+        raise HTTPException(status_code=403, detail="Réservé aux étudiants.")
+
+    from utils.student_profile import obtenir_ou_creer_profil
+    profil = obtenir_ou_creer_profil(db, current_user)
+
+    quiz = db.query(QuizResultat).filter(
+        QuizResultat.utilisateur_id == current_user.id
+    ).order_by(QuizResultat.date_quiz.desc()).first()
+
+    completion = calculer_completion(profil, quiz)
+    if not completion["peut_recommander"]:
+        return []
+
+    offres = db.query(OffreEmploi).filter(OffreEmploi.est_active == True).all()
+    entreprises = {e.id: e for e in db.query(Entreprise).all()}
+    return recommander_offres(offres, entreprises, profil, quiz, limit=limit)
+
+
+@router.get("/", response_model=List[OfferEnrichedResponse])
 def get_offers(
     skip: int = 0,
     limit: int = 100,
@@ -66,10 +102,12 @@ def get_offers(
     query = db.query(OffreEmploi).filter(OffreEmploi.est_active == True)
     if search:
         query = query.filter(OffreEmploi.titre.ilike(f"%{search}%"))
-    return query.offset(skip).limit(limit).all()
+    offres = query.offset(skip).limit(limit).all()
+    entreprises = {e.id: e for e in db.query(Entreprise).all()}
+    return [_enrich_offer(o, entreprises) for o in offres]
 
 
-@router.get("/{id}", response_model=OfferResponse)
+@router.get("/{id}", response_model=OfferEnrichedResponse)
 def get_offer(id: str, db: Session = Depends(get_db)):
     """
     Voir le détail d'une offre spécifique.
@@ -77,7 +115,8 @@ def get_offer(id: str, db: Session = Depends(get_db)):
     offer = db.query(OffreEmploi).filter(OffreEmploi.id == id).first()
     if not offer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre introuvable")
-    return offer
+    entreprises = {e.id: e for e in db.query(Entreprise).all()}
+    return _enrich_offer(offer, entreprises)
 
 
 @router.put("/{id}", response_model=OfferResponse)

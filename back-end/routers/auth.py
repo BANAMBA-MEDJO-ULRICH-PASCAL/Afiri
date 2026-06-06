@@ -4,13 +4,15 @@ Contient : inscription, connexion, /me.
 Note : get_current_user est défini dans security.py et importé par tous les routers.
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from database import get_db
-from models.user import Utilisateur, RoleEnum
+from models.user import Utilisateur, ProfilEtudiant, RoleEnum
 from security import hash_password, verify_password, create_access_token, get_current_user
 
 
@@ -25,6 +27,9 @@ class UserRegister(BaseModel):
     email: EmailStr
     mot_de_passe: str
     role: RoleEnum = RoleEnum.etudiant
+    nom: Optional[str] = None
+    prenom: Optional[str] = None
+    universite: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -70,6 +75,17 @@ def inscription(user_data: UserRegister, db: Session = Depends(get_db)):
     )
 
     db.add(new_user)
+    db.flush()
+
+    if user_data.role == RoleEnum.etudiant and user_data.nom and user_data.prenom:
+        profil = ProfilEtudiant(
+            utilisateur_id=new_user.id,
+            nom=user_data.nom,
+            prenom=user_data.prenom,
+            universite=user_data.universite,
+        )
+        db.add(profil)
+
     db.commit()
     db.refresh(new_user)
     return new_user

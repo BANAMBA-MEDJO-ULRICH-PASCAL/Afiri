@@ -42,6 +42,7 @@ class ProfilEtudiant(Base):
     universite = Column(String(255))
     competences = Column(Text)
     experiences = Column(Text)
+    projets = Column(Text)
     cv_lien = Column(String(500))
     lien_partage = Column(String(100), unique=True, default=lambda: str(uuid.uuid4())[:8])
     date_mise_a_jour = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

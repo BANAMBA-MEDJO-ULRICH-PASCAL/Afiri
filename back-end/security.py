@@ -29,7 +29,7 @@ SECRET_KEY = os.getenv(
     "Afiri-cle-secrete-dev-changer-en-production-2024"
 )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 jours
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

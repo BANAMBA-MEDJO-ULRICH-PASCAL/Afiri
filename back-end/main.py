@@ -28,9 +28,52 @@ from routers import quiz as quiz_router
 
 Base.metadata.create_all(bind=engine)
 
+# Migration légère SQLite : ajoute la colonne projets si absente
+from sqlalchemy import text, inspect
+
+def _migrate_columns():
+    inspector = inspect(engine)
+    if "profils_etudiants" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("profils_etudiants")}
+        if "projets" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE profils_etudiants ADD COLUMN projets TEXT"))
+
+_migrate_columns()
+
 # ── Auto-seed : si aucun admin n'existe en BDD, on peuple avec les données de test ──
 from database import SessionLocal
 from models.user import Utilisateur, RoleEnum
+from models.offer import OffreEmploi
+from models.user import Entreprise
+from datetime import datetime, timedelta
+import random
+
+def _ensure_minimum_offers(db):
+    """Ajoute les offres manquantes si la BDD en contient moins que le seed."""
+    from routers.seed import OFFRES_DATA
+    count = db.query(OffreEmploi).count()
+    if count >= len(OFFRES_DATA):
+        return
+    entreprise_ids = [e.id for e in db.query(Entreprise).all()]
+    if not entreprise_ids:
+        return
+    titres_existants = {o.titre for o in db.query(OffreEmploi).all()}
+    for i, data in enumerate(OFFRES_DATA):
+        if data["titre"] in titres_existants:
+            continue
+        offre = OffreEmploi(
+            entreprise_id=entreprise_ids[i % len(entreprise_ids)],
+            titre=data["titre"],
+            description=data["description"],
+            localisation=data["localisation"],
+            type_contrat=data["type_contrat"],
+            domaine=data["domaine"],
+            est_active=True,
+            date_expiration=datetime.utcnow() + timedelta(days=random.randint(15, 60)),
+        )
+        db.add(offre)
+    db.commit()
 
 _session = SessionLocal()
 try:
@@ -39,6 +82,8 @@ try:
     ).first()
     if not admin_existe:
         seed.seed_database(db=_session)
+    else:
+        _ensure_minimum_offers(_session)
 finally:
     _session.close()
 
